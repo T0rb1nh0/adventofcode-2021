@@ -1,5 +1,5 @@
 use strict;
-#use warnings FATAL => 'all';
+use warnings FATAL => 'all';
 use feature 'say';
 
 use File::Slurp;
