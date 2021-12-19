@@ -6,9 +6,7 @@ use feature 'say';
 use File::Slurp;
 use Data::Dumper;
 use List::Util;
-use Graph::Dijkstra;
-
-my $graph = Graph::Dijkstra->new();
+use Graph;
 
 my @puzzle = File::Slurp::read_file('../Input/AoC_2021_D15.txt');
 
@@ -39,37 +37,42 @@ for (my $m = 0; $m < 5; ++$m) {
 
 # Create related nodes accordingly
 my @nodeidmap = [];
+my %risk_by_nodeid = ();
 for my $y (0 .. $#riskmap) {
 	for my $x (0 .. $#{$riskmap[$y]}) {
 		my $nodeid = $y * ($#{$riskmap[$y]} + 1) + $x;
-		$graph->node($nodeid, "");
 		$nodeidmap[$y][$x] = $nodeid;
+		$risk_by_nodeid{$nodeid} = $riskmap[$y][$x];
 	}
 }
+
+my $graph = Graph->new();
 
 # Create connections between nodes
 for my $y (0 .. $#riskmap) {
 	for my $x (0 .. $#{$riskmap[$y]}) {
 		if ($y > 0) {
-			$graph->edge($nodeidmap[$y - 1][$x], $nodeidmap[$y][$x], $riskmap[$y][$x]);
+			$graph->add_weighted_edge($nodeidmap[$y - 1][$x], $nodeidmap[$y][$x], $riskmap[$y][$x]);
 		}
 		if ($x > 0) {
-			$graph->edge($nodeidmap[$y][$x - 1], $nodeidmap[$y][$x], $riskmap[$y][$x]);
+			$graph->add_weighted_edge($nodeidmap[$y][$x - 1], $nodeidmap[$y][$x], $riskmap[$y][$x]);
 		}
 		if ($y < $#riskmap) {
-			$graph->edge($nodeidmap[$y + 1][$x], $nodeidmap[$y][$x], $riskmap[$y][$x]);
+			$graph->add_weighted_edge($nodeidmap[$y + 1][$x], $nodeidmap[$y][$x], $riskmap[$y][$x]);
 		}
 		if ($x < $#{$riskmap[$y]}) {
-			$graph->edge($nodeidmap[$y][$x + 1], $nodeidmap[$y][$x], $riskmap[$y][$x]);
+			$graph->add_weighted_edge($nodeidmap[$y][$x + 1], $nodeidmap[$y][$x], $riskmap[$y][$x]);
 		}
 	}
 }
 
-# Calculate shortes path between start and end node
-my %Solution = ();
-if (my $pathCost = $graph->shortestPath(0, $nodeidmap[$#nodeidmap][$#{$nodeidmap[$y]}], \%Solution)) {
-	say "Lowest risk between start and end node is " . $pathCost;
+my $total_risk = 0;
+foreach my $node ($graph->SP_Dijkstra(0, $nodeidmap[$#nodeidmap][$#{$nodeidmap[$y]}])) {
+    next unless $node;
+    $total_risk += $risk_by_nodeid{$node};
 }
+
+say "Lowest risk between start and end node is " . $total_risk;
 
 sub print_array {
 	my ($arr_ref) = @_;
