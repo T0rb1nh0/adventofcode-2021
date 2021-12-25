@@ -25,6 +25,8 @@ foreach my $line (@puzzle) {
 	}
 }
 
+my @positions = ("0,0,0");
+
 my $got_something = 1;
 while ($got_something) {
 	$got_something = 0;
@@ -150,6 +152,8 @@ while ($got_something) {
 
 				say "Position of scanner $scanner->{id} from scanner 0 perspective is $result with axes " . join(",", ($vals[3], $vals[4], $vals[5]));
 
+				push(@positions, $result);
+
 				foreach my $beacon1 (keys %{$scanner->{beacons}}) {
 
 					my @beacon_val = split(/,/, $beacon1);
@@ -206,4 +210,17 @@ foreach my $scanner (@scanners) {
 	}
 }
 
+my $biggest_distance = 0;
+foreach my $position1 (@positions) {
+	foreach my $position2 (@positions) {
+		next if $position1 eq $position2;
+		my ($x1, $y1, $z1) = split(/,/, $position1);
+		my ($x2, $y2, $z2) = split(/,/, $position2);
+		my $distance = ($x1 - $x2 + $y1 - $y2 + $z1 - $z2);
+		$biggest_distance = $distance if $distance > $biggest_distance;
+	}
+}
+
 say "Beacons found in total: $ctr_beacons";
+
+say "Biggest distance between two scanners: $biggest_distance";
