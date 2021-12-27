@@ -27,7 +27,7 @@ while (@raw_rules) {
 	# Process next rule
 	my $this_rule = shift(@raw_rules);
 
-	say "Calculating...";
+	print "Calculating result... (" . scalar(@raw_rules) . ";" . scalar(@final_rules) . ")\r";
 
 	if ($this_rule->{remove}) {
 		@final_rules = grep {$_ ne $this_rule->{remove}} @final_rules;
@@ -65,11 +65,11 @@ while (@raw_rules) {
 						$redo = 1;
 					}
 					if ($redo) {
-					    push(@new_raw_rules, $fr);
+						push(@new_raw_rules, $fr);
 					}
 					else {
-					    push(@still_final_rules, $fr);
-                    }
+						push(@still_final_rules, $fr);
+					}
 				}
 				@final_rules = @still_final_rules;
 
@@ -84,25 +84,27 @@ while (@raw_rules) {
 		}
 
 		# Check if this rule overlaps final rule completely
-		my $tr_overlaps_completely = 1;
-		foreach my $axe (qw(X Y Z)) {
-			if ($final_rule->{"min$axe"} < $this_rule->{"min$axe"} || $final_rule->{"max$axe"} > $this_rule->{"max$axe"}) {
-				$tr_overlaps_completely = 0;
-				last
+		if ($final_rule->{"mode"} != 2) {
+			my $tr_overlaps_completely = 1;
+			foreach my $axe (qw(X Y Z)) {
+				if ($final_rule->{"min$axe"} < $this_rule->{"min$axe"} || $final_rule->{"max$axe"} > $this_rule->{"max$axe"}) {
+					$tr_overlaps_completely = 0;
+					last
+				}
 			}
-		}
 
-		# this rule overlaps final rule completely?
-		if ($tr_overlaps_completely) {
-			# This rule should just set things? Related rule could just get ignored because this one will do the job.
-			if ($this_rule->{"mode"}) {
-        		@final_rules = grep {$_ ne $final_rule} @final_rules;
-        		next;
-			}
-			# Related final rule could just get removed because this one would swipe it away anyway.
-			else {
-        		@final_rules = grep {$_ ne $final_rule} @final_rules;
-        		next;
+			# this rule overlaps final rule completely?
+			if ($tr_overlaps_completely) {
+				# This rule should just set things? Related rule could just get ignored because this one will do the job.
+				if ($this_rule->{"mode"}) {
+					@final_rules = grep {$_ ne $final_rule} @final_rules;
+					next;
+				}
+				# Related final rule could just get removed because this one would swipe it away anyway.
+				else {
+					@final_rules = grep {$_ ne $final_rule} @final_rules;
+					next;
+				}
 			}
 		}
 
@@ -132,7 +134,7 @@ while (@raw_rules) {
 
 				last;
 			}
-			elsif ($this_rule->{"max$axe"} > $final_rule->{"max$axe"} && $this_rule->{"min$axe"} < $final_rule->{"max$axe"}) {
+			elsif ($this_rule->{"max$axe"} > $final_rule->{"max$axe"} && $this_rule->{"min$axe"} <= $final_rule->{"max$axe"}) {
 				my ($new_rule1, $new_rule2) = ({ %$this_rule }, { %$this_rule });
 				$new_rule1->{"min$axe"} = $final_rule->{"max$axe"} + 1;
 				$new_rule2->{"max$axe"} = $final_rule->{"max$axe"};
@@ -159,4 +161,4 @@ foreach my $rule (@final_rules) {
 	$cubes_on_in_total += $val;
 }
 
-say "Number of cubes on in total: " . $cubes_on_in_total;
+say "\nNumber of cubes on in total: " . $cubes_on_in_total;
