@@ -27,7 +27,7 @@ while (@raw_rules) {
 	# Process next rule
 	my $this_rule = shift(@raw_rules);
 
-	print "\rRules left to be processed: " . scalar(@raw_rules) . "\t Final rules being found " . scalar(@final_rules);
+	say "Calculating...";
 
 	if ($this_rule->{remove}) {
 		@final_rules = grep {$_ ne $this_rule->{remove}} @final_rules;
@@ -37,38 +37,73 @@ while (@raw_rules) {
 	# Check rule against all so far verified rules
 	foreach my $final_rule (@final_rules) {
 
-		# Check if rules overlap each other completely
-		my $overlap_completely = 1;
+		# Check if final rule overlaps this rule completely
+		my $fr_overlaps_completely = 1;
 		foreach my $axe (qw(X Y Z)) {
 			if ($this_rule->{"min$axe"} < $final_rule->{"min$axe"} || $this_rule->{"max$axe"} > $final_rule->{"max$axe"}) {
-				$overlap_completely = 0;
-				last;
+				$fr_overlaps_completely = 0;
+				last
 			}
 		}
-		# They overlap completely?
-		if ($overlap_completely) {
-			# This rule should activate things? No need to keep this rule because all cubes are being set on already.
+
+		# Final rule overlaps this rule completely?
+		if ($fr_overlaps_completely) {
+			# This rule should activate things and is some part of final rule? No need to keep this rule because final rule does the job.
 			if ($this_rule->{"mode"}) {
 				$this_rule = undef;
 				last;
 			}
+			# This rule should remove things? Lets put this rule before related final rule took place to block it accordingly
 			else {
 				$this_rule->{"mode"} = 2;
-				my @rules;
+
+				my @new_raw_rules;
+				my @still_final_rules;
+				my $redo = 0;
 				foreach my $fr (@final_rules) {
 					if ($fr eq $final_rule) {
-						push(@rules, $this_rule);
+						$redo = 1;
 					}
-					push(@rules, $fr);
+					if ($redo) {
+					    push(@new_raw_rules, $fr);
+					}
+					else {
+					    push(@still_final_rules, $fr);
+                    }
 				}
+				@final_rules = @still_final_rules;
+
 				my $new_rule = ({ %$this_rule });
 				$new_rule->{remove} = $this_rule;
-				unshift(@raw_rules, @rules, $new_rule);
-				@final_rules = ();
+
+				unshift(@raw_rules, $this_rule, @new_raw_rules, $new_rule);
+
 				$this_rule = undef;
 				last;
 			}
-			last;
+		}
+
+		# Check if this rule overlaps final rule completely
+		my $tr_overlaps_completely = 1;
+		foreach my $axe (qw(X Y Z)) {
+			if ($final_rule->{"min$axe"} < $this_rule->{"min$axe"} || $final_rule->{"max$axe"} > $this_rule->{"max$axe"}) {
+				$tr_overlaps_completely = 0;
+				last
+			}
+		}
+
+		# this rule overlaps final rule completely?
+		if ($tr_overlaps_completely) {
+			# This rule should just set things? Related rule could just get ignored because this one will do the job.
+			if ($this_rule->{"mode"}) {
+        		@final_rules = grep {$_ ne $final_rule} @final_rules;
+        		next;
+			}
+			# Related final rule could just get removed because this one would swipe it away anyway.
+			else {
+        		@final_rules = grep {$_ ne $final_rule} @final_rules;
+        		next;
+			}
 		}
 
 		# Check if this rule does intersect with some rule gathered before
