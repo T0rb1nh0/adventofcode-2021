@@ -1,6 +1,7 @@
 use strict;
 use warnings FATAL => 'all';
 use feature "say";
+use bigint;
 
 use File::Slurp;
 use Data::Dumper;
@@ -10,150 +11,157 @@ $Data::Dumper::Sortkeys = 1;
 
 my @puzzle = File::Slurp::read_file('../Input/AoC_2021_D22.txt');
 
-my @raw_rules;
+my @original_rules;
+my @rules_to_be_processed;
+my @processed_rules;
 
 foreach my $line (@puzzle) {
 	$line =~ s/^\s+|\s+$//g;
 	next unless $line;
 	next unless $line =~ m/^(on|off) x=(-?\d+)..(-?\d+),y=(-?\d+)..(-?\d+),z=(-?\d+)..(-?\d+)/;
-	# Load raw rules of the input file
-	push(@raw_rules, { "mode" => $1 eq 'on' ? 1 : 0, "minX" => $2, "maxX" => $3, "minY" => $4, "maxY" => $5, "minZ" => $6, "maxZ" => $7 });
+	# Load original rules of the input file
+	push(@original_rules, { "mode" => $1 eq 'on' ? 1 : 0, "minX" => $2, "maxX" => $3, "minY" => $4, "maxY" => $5, "minZ" => $6, "maxZ" => $7 });
 }
 
-# Store final rules of cubes which are just on
-my @final_rules;
-# As long as not all raw rules have been processed move on
-while (@raw_rules) {
-	# Process next rule
-	my $this_rule = shift(@raw_rules);
+# Just take original rules one by one to be able to print some progress information
+while (@original_rules) {
 
-	print "Calculating result... (" . scalar(@raw_rules) . ";" . scalar(@final_rules) . ")\r";
+    push(@rules_to_be_processed, shift(@original_rules));
 
-	if ($this_rule->{remove}) {
-		@final_rules = grep {$_ ne $this_rule->{remove}} @final_rules;
-		next;
-	};
+    # As long as not all rules have been processed move on with the current rules before taking another one
+    while (@rules_to_be_processed) {
 
-	# Check rule against all so far verified rules
-	foreach my $final_rule (@final_rules) {
+        print "Processing next rule... (Rules left to be processed: " . scalar(@original_rules) . "; Rules created/processed successfully: " . scalar(@processed_rules) . ")\r";
 
-		# Check if final rule overlaps this rule completely
-		my $fr_overlaps_completely = 1;
-		foreach my $axe (qw(X Y Z)) {
-			if ($this_rule->{"min$axe"} < $final_rule->{"min$axe"} || $this_rule->{"max$axe"} > $final_rule->{"max$axe"}) {
-				$fr_overlaps_completely = 0;
-				last
-			}
-		}
+        # Process next rule
+        my $this_rule = shift(@rules_to_be_processed);
 
-		# Final rule overlaps this rule completely?
-		if ($fr_overlaps_completely) {
-			# This rule should activate things and is some part of final rule? No need to keep this rule because final rule does the job.
-			if ($this_rule->{"mode"}) {
-				$this_rule = undef;
-				last;
-			}
-			# This rule should remove things? Lets put this rule before related final rule took place to block it accordingly
-			else {
-				$this_rule->{"mode"} = 2;
+        if ($this_rule->{remove}) {
+            @processed_rules = grep {$_ ne $this_rule->{remove}} @processed_rules;
+            next;
+        };
 
-				my @new_raw_rules;
-				my @still_final_rules;
-				my $redo = 0;
-				foreach my $fr (@final_rules) {
-					if ($fr eq $final_rule) {
-						$redo = 1;
-					}
-					if ($redo) {
-						push(@new_raw_rules, $fr);
-					}
-					else {
-						push(@still_final_rules, $fr);
-					}
-				}
-				@final_rules = @still_final_rules;
+        # Check rule against all so far verified rules
+        foreach my $processed_rule (@processed_rules) {
 
-				my $new_rule = ({ %$this_rule });
-				$new_rule->{remove} = $this_rule;
+            # Check if processed rule overlaps this rule completely
+            my $fr_overlaps_completely = 1;
+            foreach my $axe (qw(X Y Z)) {
+                if ($this_rule->{"min$axe"} < $processed_rule->{"min$axe"} || $this_rule->{"max$axe"} > $processed_rule->{"max$axe"}) {
+                    $fr_overlaps_completely = 0;
+                    last
+                }
+            }
 
-				unshift(@raw_rules, $this_rule, @new_raw_rules, $new_rule);
+            # Processed rule overlaps this rule completely?
+            if ($fr_overlaps_completely) {
+                # This rule should activate things and is some part of processed rule? No need to keep this rule because processed rule does the job.
+                if ($this_rule->{"mode"}) {
+                    $this_rule = undef;
+                    last;
+                }
+                # This rule should remove things? Lets put this rule before related processed rule took place to block it accordingly
+                else {
+                    $this_rule->{"mode"} = 2;
 
-				$this_rule = undef;
-				last;
-			}
-		}
+                    my @new_rules_to_be_processed;
+                    my @still_processed_rules;
+                    my $redo = 0;
+                    foreach my $fr (@processed_rules) {
+                        if ($fr eq $processed_rule) {
+                            $redo = 1;
+                        }
+                        if ($redo) {
+                            push(@new_rules_to_be_processed, $fr);
+                        }
+                        else {
+                            push(@still_processed_rules, $fr);
+                        }
+                    }
+                    @processed_rules = @still_processed_rules;
 
-		# Check if this rule overlaps final rule completely
-		if ($final_rule->{"mode"} != 2) {
-			my $tr_overlaps_completely = 1;
-			foreach my $axe (qw(X Y Z)) {
-				if ($final_rule->{"min$axe"} < $this_rule->{"min$axe"} || $final_rule->{"max$axe"} > $this_rule->{"max$axe"}) {
-					$tr_overlaps_completely = 0;
-					last
-				}
-			}
+                    my $new_rule = ({ %$this_rule });
+                    $new_rule->{remove} = $this_rule;
 
-			# this rule overlaps final rule completely?
-			if ($tr_overlaps_completely) {
-				# This rule should just set things? Related rule could just get ignored because this one will do the job.
-				if ($this_rule->{"mode"}) {
-					@final_rules = grep {$_ ne $final_rule} @final_rules;
-					next;
-				}
-				# Related final rule could just get removed because this one would swipe it away anyway.
-				else {
-					@final_rules = grep {$_ ne $final_rule} @final_rules;
-					next;
-				}
-			}
-		}
+                    unshift(@rules_to_be_processed, $this_rule, @new_rules_to_be_processed, $new_rule);
 
-		# Check if this rule does intersect with some rule gathered before
-		my $no_intersection = 0;
-		foreach my $axe (qw(X Y Z)) {
-			if
-			($this_rule->{"max$axe"} < $final_rule->{"min$axe"} || $this_rule->{"min$axe"} > $final_rule->{"max$axe"}) {
-				$no_intersection = 1;
-				last;
-			}
-		}
+                    $this_rule = undef;
+                    last;
+                }
+            }
 
-		# No intersection? Lets keep both
-		next if $no_intersection;
+            # Check if this rule overlaps processed rule completely
+            if ($processed_rule->{"mode"} != 2) {
+                my $tr_overlaps_completely = 1;
+                foreach my $axe (qw(X Y Z)) {
+                    if ($processed_rule->{"min$axe"} < $this_rule->{"min$axe"} || $processed_rule->{"max$axe"} > $this_rule->{"max$axe"}) {
+                        $tr_overlaps_completely = 0;
+                        last
+                    }
+                }
 
-		# Both rules do intersect? Lets create new rules for each sub block
-		foreach my $axe (qw(X Y Z)) {
-			if ($this_rule->{"min$axe"} < $final_rule->{"min$axe"} && $this_rule->{"max$axe"} >= $final_rule->{"min$axe"}) {
-				my ($new_rule1, $new_rule2) = ({ %$this_rule }, { %$this_rule });
-				$new_rule1->{"max$axe"} = $final_rule->{"min$axe"} - 1;
-				$new_rule2->{"min$axe"} = $final_rule->{"min$axe"};
+                # this rule overlaps processed rule completely?
+                if ($tr_overlaps_completely) {
+                    # This rule should just set things? Related rule could just get ignored because this one will do the job.
+                    if ($this_rule->{"mode"}) {
+                        @processed_rules = grep {$_ ne $processed_rule} @processed_rules;
+                        next;
+                    }
+                    # Related processed rule could just get removed because this one would swipe it away anyway.
+                    else {
+                        @processed_rules = grep {$_ ne $processed_rule} @processed_rules;
+                        next;
+                    }
+                }
+            }
 
-				unshift(@raw_rules, $new_rule1, $new_rule2);
+            # Check if this rule does intersect with some rule gathered before
+            my $no_intersection = 0;
+            foreach my $axe (qw(X Y Z)) {
+                if
+                ($this_rule->{"max$axe"} < $processed_rule->{"min$axe"} || $this_rule->{"min$axe"} > $processed_rule->{"max$axe"}) {
+                    $no_intersection = 1;
+                    last;
+                }
+            }
 
-				$this_rule = undef;
+            # No intersection? Lets keep both
+            next if $no_intersection;
 
-				last;
-			}
-			elsif ($this_rule->{"max$axe"} > $final_rule->{"max$axe"} && $this_rule->{"min$axe"} <= $final_rule->{"max$axe"}) {
-				my ($new_rule1, $new_rule2) = ({ %$this_rule }, { %$this_rule });
-				$new_rule1->{"min$axe"} = $final_rule->{"max$axe"} + 1;
-				$new_rule2->{"max$axe"} = $final_rule->{"max$axe"};
+            # Both rules do intersect? Lets create new rules for each sub block
+            foreach my $axe (qw(X Y Z)) {
+                if ($this_rule->{"min$axe"} < $processed_rule->{"min$axe"} && $this_rule->{"max$axe"} >= $processed_rule->{"min$axe"}) {
+                    my ($new_rule1, $new_rule2) = ({ %$this_rule }, { %$this_rule });
+                    $new_rule1->{"max$axe"} = $processed_rule->{"min$axe"} - 1;
+                    $new_rule2->{"min$axe"} = $processed_rule->{"min$axe"};
 
-				unshift(@raw_rules, $new_rule1, $new_rule2);
+                    unshift(@rules_to_be_processed, $new_rule1, $new_rule2);
 
-				$this_rule = undef;
+                    $this_rule = undef;
 
-				last;
-			}
-		}
+                    last;
+                }
+                elsif ($this_rule->{"max$axe"} > $processed_rule->{"max$axe"} && $this_rule->{"min$axe"} <= $processed_rule->{"max$axe"}) {
+                    my ($new_rule1, $new_rule2) = ({ %$this_rule }, { %$this_rule });
+                    $new_rule1->{"min$axe"} = $processed_rule->{"max$axe"} + 1;
+                    $new_rule2->{"max$axe"} = $processed_rule->{"max$axe"};
 
-		last;
-	}
-	push(@final_rules, $this_rule) if $this_rule && $this_rule->{"mode"};
+                    unshift(@rules_to_be_processed, $new_rule1, $new_rule2);
+
+                    $this_rule = undef;
+
+                    last;
+                }
+            }
+
+            last;
+        }
+        push(@processed_rules, $this_rule) if $this_rule && $this_rule->{"mode"};
+    }
 }
 
 my $cubes_on_in_total = 0;
-foreach my $rule (@final_rules) {
+foreach my $rule (@processed_rules) {
 	my $val = 1;
 	foreach my $axe (qw(X Y Z)) {
 		$val *= ($rule->{"max$axe"} - $rule->{"min$axe"} + 1);
