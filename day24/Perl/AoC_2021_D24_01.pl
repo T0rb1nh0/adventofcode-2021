@@ -5,7 +5,7 @@ use File::Slurp;
 use Data::Dumper;
 use List::Util;
 use POSIX;
-use bigint;
+#use bigint;
 
 my @puzzle = File::Slurp::read_file('../Input/AoC_2021_D24.txt');
 
@@ -80,29 +80,20 @@ sub interpreted_bf_approach {
 	while (--$number >= 11111111111111) {
 		next if (index($number, "0") > -1);
 
-		my @vars = (0, 0, 0, 0);
+		my @vars = (0, 0, 0);
 		for my $i (0 .. length($number) - 1) {
 			# Load w value
 			$vars[0] = substr($number, $i, 1);
 
 			# Generate x value
-			$vars[1] = (($vars[1] % 26) + $x_addition{$i} != $vars[0]) ? 1 : 0;
-
-			# Generate y value before using for z first time
-			$vars[2] = 25 * $vars[1] + 1;
-
-			# Multiply z with y
-			$vars[3] = floor($vars[3] / $z_division{$i}) * $vars[2];
-
-			# Generate y finally
-			$vars[2] = ($vars[0] + $y_addition{$i}) * $vars[1];
+			$vars[1] = (($vars[2] % 26) + $x_addition{$i} != $vars[0]) ? 1 : 0;
 
 			#Calculate final z
-			$vars[3] += $vars[2];
+			$vars[2] += floor($vars[2] / $z_division{$i}) * (25 * $vars[1] + 1) + ($vars[0] + $y_addition{$i}) * $vars[1];
 		}
 
-		print "Result of $number is " . $vars[3] . "\r";
-		last if !$vars[3];
+		print "Result of $number is " . $vars[2] . "\r";
+		last if !$vars[2];
 	}
 }
 
